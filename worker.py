@@ -1,20 +1,19 @@
 import pika
-import time
 
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-channel = connection.channel()
-channel.queue_declare(queue="importers")
+with pika.BlockingConnection(pika.ConnectionParameters('localhost')) as connection:
+    channel = connection.channel()
+    channel.exchange_declare(exchange='logs', exchange_type='fanout')
 
+    results = channel.queue_declare(exclusive=True)
+    queue_name = results.method.queue
+    channel.queue_bind(exchange='logs', queue=queue_name)
 
-def importers(ch, method, properties, body):
-    time.sleep(5)
-    print(body)
-    #  Para cuando deseamos enviar la respuesta al publisher
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+    print('[*] Starting worker with queue {}'.format(queue_name))
 
 
-channel.basic_consume(importers, queue="importers", no_ack=False)
+    def callback(ch, method, properties, body):
+        print('[*] Message for broker {} : {}'.format(queue_name, body))
 
-print('Inicio del Worker')
 
-channel.start_consuming()
+    channel.basic_consume(callback, queue=queue_name, no_ack=True)
+    channel.start_consuming()

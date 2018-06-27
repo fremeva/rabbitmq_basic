@@ -1,13 +1,17 @@
 import pika
+import sys
 
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-channel = connection.channel()
-channel.queue_declare(queue="importers")
-channel.basic_publish(
-    exchange="",
-    routing_key="importers",
-    body="Hola a todos! 3"
-)
-print("Finalizado")
+with pika.BlockingConnection(pika.ConnectionParameters('localhost')) as connection:
+    channel = connection.channel()
 
-connection.close()
+    channel.exchange_declare(exchange='logs', exchange_type='fanout')
+
+    message = ' '.join(sys.argv[1:]) or 'info: hello world'
+
+    channel.basic_publish(
+        exchange="logs",
+        routing_key="",
+        body=message
+    )
+
+    print("[*] Sent message : {}".format(message))
