@@ -16,5 +16,4 @@ def importers(ch, method, properties, body):
 channel.basic_consume(importers, queue="importers", no_ack=False)
 
 print('Inicio del Worker')
-
 channel.start_consuming()
