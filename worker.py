@@ -1,19 +1,37 @@
 import pika
 
-with pika.BlockingConnection(pika.ConnectionParameters('localhost')) as connection:
-    channel = connection.channel()
-    channel.exchange_declare(exchange='logs', exchange_type='fanout')
+connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
 
-    results = channel.queue_declare(exclusive=True)
-    queue_name = results.method.queue
-    channel.queue_bind(exchange='logs', queue=queue_name)
+channel = connection.channel()
 
-    print('[*] Starting worker with queue {}'.format(queue_name))
+channel.queue_declare(queue='rpc_queue')
 
 
-    def callback(ch, method, properties, body):
-        print('[*] Message for broker {} : {}'.format(queue_name, body))
+def fib(n):
+    if n == 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+        return fib(n - 1) + fib(n - 2)
 
 
-    channel.basic_consume(callback, queue=queue_name, no_ack=True)
-    channel.start_consuming()
+def on_request(ch, method, props, body):
+    n = int(body)
+
+    print(" [.] fib(%s)" % n)
+    response = fib(n)
+
+    ch.basic_publish(exchange='',
+                     routing_key=props.reply_to,
+                     properties=pika.BasicProperties(correlation_id= \
+                                                         props.correlation_id),
+                     body=str(response))
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
+channel.basic_qos(prefetch_count=1)
+channel.basic_consume(on_request, queue='rpc_queue')
+
+print(" [x] Awaiting RPC requests")
+channel.start_consuming()
